@@ -1,11 +1,13 @@
 package org.thoughtcrime.securesms;
 
+import android.Manifest;
 import android.content.Context;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 
 import org.thoughtcrime.securesms.util.CharacterCalculator;
 import org.thoughtcrime.securesms.util.MmsCharacterCalculator;
+import org.thoughtcrime.securesms.permissions.Permissions;
 import org.thoughtcrime.securesms.util.PushCharacterCalculator;
 import org.thoughtcrime.securesms.util.SmsCharacterCalculator;
 import org.thoughtcrime.securesms.util.dualsim.SubscriptionInfoCompat;
@@ -30,8 +32,9 @@ public class TransportOptions {
   private Optional<TransportOption> selectedOption        = Optional.absent();
 
   public TransportOptions(Context context, boolean media) {
-    this.context           = context;
-    this.enabledTransports = initializeAvailableTransports(media);
+    this.context               = context;
+    this.enabledTransports     = initializeAvailableTransports(media);
+    this.defaultSubscriptionId = new SubscriptionManagerCompat(context).getPreferredSubscriptionId();
   }
 
   public void reset(boolean media) {
@@ -145,7 +148,13 @@ public class TransportOptions {
   {
     List<TransportOption>        results             = new LinkedList<>();
     SubscriptionManagerCompat    subscriptionManager = new SubscriptionManagerCompat(context);
-    List<SubscriptionInfoCompat> subscriptions       = subscriptionManager.getActiveSubscriptionInfoList();
+    List<SubscriptionInfoCompat> subscriptions;
+
+    if (Permissions.hasAll(context, Manifest.permission.READ_PHONE_STATE)) {
+      subscriptions = subscriptionManager.getActiveSubscriptionInfoList();
+    } else {
+      subscriptions = new LinkedList<>();
+    }
 
     if (subscriptions.size() < 2) {
       results.add(new TransportOption(Type.SMS, R.drawable.ic_send_sms_white_24dp,

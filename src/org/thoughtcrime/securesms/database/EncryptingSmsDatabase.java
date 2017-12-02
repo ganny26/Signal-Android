@@ -35,6 +35,7 @@ import org.thoughtcrime.securesms.sms.IncomingTextMessage;
 import org.thoughtcrime.securesms.sms.OutgoingTextMessage;
 import org.thoughtcrime.securesms.util.LRUCache;
 import org.whispersystems.libsignal.InvalidMessageException;
+import org.whispersystems.libsignal.util.guava.Optional;
 
 import java.lang.ref.SoftReference;
 import java.util.Collections;
@@ -63,9 +64,9 @@ public class EncryptingSmsDatabase extends SmsDatabase {
 
   public long insertMessageOutbox(MasterSecretUnion masterSecret, long threadId,
                                   OutgoingTextMessage message, boolean forceSms,
-                                  long timestamp)
+                                  long timestamp, InsertListener insertListener)
   {
-    long type = Types.BASE_OUTBOX_TYPE;
+    long type = Types.BASE_SENDING_TYPE;
 
     if (masterSecret.getMasterSecret().isPresent()) {
       message = message.withBody(getEncryptedBody(masterSecret.getMasterSecret().get(), message.getMessageBody()));
@@ -75,11 +76,11 @@ public class EncryptingSmsDatabase extends SmsDatabase {
       type   |= Types.ENCRYPTION_ASYMMETRIC_BIT;
     }
 
-    return insertMessageOutbox(threadId, message, type, forceSms, timestamp);
+    return insertMessageOutbox(threadId, message, type, forceSms, timestamp, insertListener);
   }
 
-  public Pair<Long, Long> insertMessageInbox(@NonNull MasterSecretUnion masterSecret,
-                                             @NonNull IncomingTextMessage message)
+  public Optional<InsertResult> insertMessageInbox(@NonNull MasterSecretUnion masterSecret,
+                                                   @NonNull IncomingTextMessage message)
   {
     if (masterSecret.getMasterSecret().isPresent()) {
       return insertMessageInbox(masterSecret.getMasterSecret().get(), message);
@@ -88,8 +89,8 @@ public class EncryptingSmsDatabase extends SmsDatabase {
     }
   }
 
-  private Pair<Long, Long> insertMessageInbox(@NonNull MasterSecret masterSecret,
-                                              @NonNull IncomingTextMessage message)
+  private Optional<InsertResult> insertMessageInbox(@NonNull MasterSecret masterSecret,
+                                                    @NonNull IncomingTextMessage message)
   {
     long type = Types.BASE_INBOX_TYPE | Types.ENCRYPTION_SYMMETRIC_BIT;
 
@@ -98,8 +99,8 @@ public class EncryptingSmsDatabase extends SmsDatabase {
     return insertMessageInbox(message, type);
   }
 
-  private Pair<Long, Long> insertMessageInbox(@NonNull AsymmetricMasterSecret masterSecret,
-                                              @NonNull IncomingTextMessage message)
+  private Optional<InsertResult> insertMessageInbox(@NonNull AsymmetricMasterSecret masterSecret,
+                                                    @NonNull IncomingTextMessage message)
   {
     long type = Types.BASE_INBOX_TYPE | Types.ENCRYPTION_ASYMMETRIC_BIT;
 
@@ -109,7 +110,7 @@ public class EncryptingSmsDatabase extends SmsDatabase {
   }
 
   public Pair<Long, Long> updateBundleMessageBody(MasterSecretUnion masterSecret, long messageId, String body) {
-    long type = Types.BASE_INBOX_TYPE | Types.SECURE_MESSAGE_BIT;
+    long type = Types.BASE_INBOX_TYPE | Types.SECURE_MESSAGE_BIT | Types.PUSH_MESSAGE_BIT;
     String encryptedBody;
 
     if (masterSecret.getMasterSecret().isPresent()) {

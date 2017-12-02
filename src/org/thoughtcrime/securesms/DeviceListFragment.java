@@ -3,6 +3,7 @@ package org.thoughtcrime.securesms;
 import android.app.Activity;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.ListFragment;
 import android.support.v4.app.LoaderManager;
@@ -77,7 +78,7 @@ public class DeviceListFragment extends ListFragment
   @Override
   public void onActivityCreated(Bundle bundle) {
     super.onActivityCreated(bundle);
-    getLoaderManager().initLoader(0, null, this).forceLoad();
+    getLoaderManager().initLoader(0, null, this);
     getListView().setOnItemClickListener(this);
   }
 
@@ -142,8 +143,7 @@ public class DeviceListFragment extends ListFragment
                               new DialogInterface.OnClickListener() {
       @Override
       public void onClick(DialogInterface dialog, int which) {
-        getLoaderManager().getLoader(0).forceLoad();
-        getLoaderManager().initLoader(0, null, DeviceListFragment.this);
+        getLoaderManager().restartLoader(0, null, DeviceListFragment.this);
       }
     });
 
@@ -184,7 +184,7 @@ public class DeviceListFragment extends ListFragment
         super.onPostExecute(result);
         getLoaderManager().restartLoader(0, null, DeviceListFragment.this);
       }
-    }.execute();
+    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
   }
 
   @Override

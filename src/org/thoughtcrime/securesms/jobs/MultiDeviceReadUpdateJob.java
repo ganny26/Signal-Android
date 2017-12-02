@@ -1,12 +1,13 @@
 package org.thoughtcrime.securesms.jobs;
 
 import android.content.Context;
+import android.util.Log;
 
 import org.thoughtcrime.securesms.crypto.MasterSecret;
 import org.thoughtcrime.securesms.database.MessagingDatabase.SyncMessageId;
 import org.thoughtcrime.securesms.dependencies.InjectableType;
-import org.thoughtcrime.securesms.dependencies.TextSecureCommunicationModule;
 import org.thoughtcrime.securesms.jobs.requirements.MasterSecretRequirement;
+import org.thoughtcrime.securesms.util.TextSecurePreferences;
 import org.whispersystems.jobqueue.JobParameters;
 import org.whispersystems.jobqueue.requirements.NetworkRequirement;
 import org.whispersystems.signalservice.api.SignalServiceMessageSender;
@@ -29,8 +30,7 @@ public class MultiDeviceReadUpdateJob extends MasterSecretJob implements Injecta
 
   private final List<SerializableSyncMessageId> messageIds;
 
-  @Inject
-  transient TextSecureCommunicationModule.TextSecureMessageSenderFactory messageSenderFactory;
+  @Inject transient SignalServiceMessageSender messageSender;
 
   public MultiDeviceReadUpdateJob(Context context, List<SyncMessageId> messageIds) {
     super(context, JobParameters.newBuilder()
@@ -42,20 +42,24 @@ public class MultiDeviceReadUpdateJob extends MasterSecretJob implements Injecta
     this.messageIds = new LinkedList<>();
 
     for (SyncMessageId messageId : messageIds) {
-      this.messageIds.add(new SerializableSyncMessageId(messageId.getAddress(), messageId.getTimetamp()));
+      this.messageIds.add(new SerializableSyncMessageId(messageId.getAddress().toPhoneString(), messageId.getTimetamp()));
     }
   }
 
 
   @Override
   public void onRun(MasterSecret masterSecret) throws IOException, UntrustedIdentityException {
+    if (!TextSecurePreferences.isMultiDevice(context)) {
+      Log.w(TAG, "Not multi device...");
+      return;
+    }
+
     List<ReadMessage> readMessages = new LinkedList<>();
 
     for (SerializableSyncMessageId messageId : messageIds) {
       readMessages.add(new ReadMessage(messageId.sender, messageId.timestamp));
     }
 
-    SignalServiceMessageSender messageSender = messageSenderFactory.create();
     messageSender.sendMessage(SignalServiceSyncMessage.forRead(readMessages));
   }
 

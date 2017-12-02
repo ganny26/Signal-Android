@@ -16,9 +16,11 @@ import java.util.List;
 public class PointerAttachment extends Attachment {
 
   public PointerAttachment(@NonNull String contentType, int transferState, long size,
-                           @NonNull String location, @NonNull String key, @NonNull String relay)
+                           @Nullable String fileName,  @NonNull String location,
+                           @NonNull String key, @NonNull String relay,
+                           @Nullable byte[] digest, boolean voiceNote)
   {
-    super(contentType, transferState, size, location, key, relay);
+    super(contentType, transferState, size, fileName, location, key, relay, digest, null, voiceNote);
   }
 
   @Nullable
@@ -42,10 +44,13 @@ public class PointerAttachment extends Attachment {
         if (pointer.isPointer()) {
           String encryptedKey = MediaKey.getEncrypted(masterSecret, pointer.asPointer().getKey());
           results.add(new PointerAttachment(pointer.getContentType(),
-                                            AttachmentDatabase.TRANSFER_PROGRESS_AUTO_PENDING,
+                                            AttachmentDatabase.TRANSFER_PROGRESS_PENDING,
                                             pointer.asPointer().getSize().or(0),
+                                            pointer.asPointer().getFileName().orNull(),
                                             String.valueOf(pointer.asPointer().getId()),
-                                            encryptedKey, pointer.asPointer().getRelay().orNull()));
+                                            encryptedKey, pointer.asPointer().getRelay().orNull(),
+                                            pointer.asPointer().getDigest().orNull(),
+                                            pointer.asPointer().getVoiceNote()));
         }
       }
     }
