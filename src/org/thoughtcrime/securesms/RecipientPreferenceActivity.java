@@ -19,6 +19,7 @@ import android.support.design.widget.CollapsingToolbarLayout;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.Loader;
+import android.support.v4.view.ViewCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.preference.CheckBoxPreference;
 import android.support.v7.preference.ListPreference;
@@ -38,7 +39,6 @@ import org.thoughtcrime.securesms.color.MaterialColor;
 import org.thoughtcrime.securesms.color.MaterialColors;
 import org.thoughtcrime.securesms.components.ThreadPhotoRailView;
 import org.thoughtcrime.securesms.crypto.IdentityKeyParcelable;
-import org.thoughtcrime.securesms.crypto.MasterSecret;
 import org.thoughtcrime.securesms.database.Address;
 import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.IdentityDatabase;
@@ -58,6 +58,7 @@ import org.thoughtcrime.securesms.util.DynamicLanguage;
 import org.thoughtcrime.securesms.util.DynamicNoActionBarTheme;
 import org.thoughtcrime.securesms.util.DynamicTheme;
 import org.thoughtcrime.securesms.util.IdentityUtil;
+import org.thoughtcrime.securesms.util.TextSecurePreferences;
 import org.thoughtcrime.securesms.util.Util;
 import org.thoughtcrime.securesms.util.ViewUtil;
 import org.thoughtcrime.securesms.util.concurrent.ListenableFuture;
@@ -84,7 +85,6 @@ public class RecipientPreferenceActivity extends PassphraseRequiredActionBarActi
   private final DynamicLanguage dynamicLanguage = new DynamicLanguage();
 
   private ImageView               avatar;
-  private MasterSecret            masterSecret;
   private GlideRequests           glideRequests;
   private Address                 address;
   private TextView                threadPhotoRailLabel;
@@ -98,9 +98,8 @@ public class RecipientPreferenceActivity extends PassphraseRequiredActionBarActi
   }
 
   @Override
-  public void onCreate(Bundle instanceState, @NonNull MasterSecret masterSecret) {
+  public void onCreate(Bundle instanceState, boolean ready) {
     setContentView(R.layout.recipient_preference_activity);
-    this.masterSecret  = masterSecret;
     this.glideRequests = GlideApp.with(this);
     this.address       = getIntent().getParcelableExtra(ADDRESS_EXTRA);
 
@@ -160,6 +159,7 @@ public class RecipientPreferenceActivity extends PassphraseRequiredActionBarActi
       intent.putExtra(MediaPreviewActivity.OUTGOING_EXTRA, mediaRecord.isOutgoing());
       intent.putExtra(MediaPreviewActivity.DATE_EXTRA, mediaRecord.getDate());
       intent.putExtra(MediaPreviewActivity.SIZE_EXTRA, mediaRecord.getAttachment().getSize());
+      intent.putExtra(MediaPreviewActivity.LEFT_IS_RECENT_EXTRA, ViewCompat.getLayoutDirection(threadPhotoRailView) == ViewCompat.LAYOUT_DIRECTION_LTR);
       intent.setDataAndType(mediaRecord.getAttachment().getDataUri(), mediaRecord.getContentType());
       startActivity(intent);
     });
@@ -202,7 +202,7 @@ public class RecipientPreferenceActivity extends PassphraseRequiredActionBarActi
 
   @Override
   public Loader<Cursor> onCreateLoader(int id, Bundle args) {
-    return new ThreadMediaLoader(this, masterSecret, address, true);
+    return new ThreadMediaLoader(this, address, true);
   }
 
   @Override
@@ -215,16 +215,16 @@ public class RecipientPreferenceActivity extends PassphraseRequiredActionBarActi
       this.threadPhotoRailView.setVisibility(View.GONE);
     }
 
-    this.threadPhotoRailView.setCursor(masterSecret, glideRequests, data);
+    this.threadPhotoRailView.setCursor(glideRequests, data);
 
     Bundle bundle = new Bundle();
     bundle.putParcelable(ADDRESS_EXTRA, address);
-    initFragment(R.id.preference_fragment, new RecipientPreferenceFragment(), masterSecret, null, bundle);
+    initFragment(R.id.preference_fragment, new RecipientPreferenceFragment(), null, bundle);
   }
 
   @Override
   public void onLoaderReset(Loader<Cursor> loader) {
-    this.threadPhotoRailView.setCursor(masterSecret, glideRequests, null);
+    this.threadPhotoRailView.setCursor(glideRequests, null);
   }
 
   public static class RecipientPreferenceFragment
@@ -372,7 +372,7 @@ public class RecipientPreferenceActivity extends PassphraseRequiredActionBarActi
       public boolean onPreferenceChange(Preference preference, Object newValue) {
         Uri value = (Uri)newValue;
 
-        if (Settings.System.DEFAULT_NOTIFICATION_URI.equals(value)) {
+        if (TextSecurePreferences.getNotificationRingtone(getContext()).equals(value)) {
           value = null;
         } else if (value == null) {
           value = Uri.EMPTY;
@@ -403,6 +403,7 @@ public class RecipientPreferenceActivity extends PassphraseRequiredActionBarActi
         Intent intent = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER);
         intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true);
         intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI, TextSecurePreferences.getNotificationRingtone(getContext()));
         intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION);
         intent.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, uri);
 

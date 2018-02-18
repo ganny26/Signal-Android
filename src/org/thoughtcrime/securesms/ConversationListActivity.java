@@ -16,6 +16,7 @@
  */
 package org.thoughtcrime.securesms;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
@@ -23,7 +24,6 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -33,11 +33,11 @@ import android.widget.Toast;
 
 import org.thoughtcrime.securesms.components.RatingManager;
 import org.thoughtcrime.securesms.components.SearchToolbar;
-import org.thoughtcrime.securesms.crypto.MasterSecret;
 import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.MessagingDatabase.MarkedMessageInfo;
 import org.thoughtcrime.securesms.notifications.MarkReadReceiver;
 import org.thoughtcrime.securesms.notifications.MessageNotifier;
+import org.thoughtcrime.securesms.permissions.Permissions;
 import org.thoughtcrime.securesms.recipients.Recipient;
 import org.thoughtcrime.securesms.service.KeyCachingService;
 import org.thoughtcrime.securesms.util.DynamicLanguage;
@@ -57,7 +57,6 @@ public class ConversationListActivity extends PassphraseRequiredActionBarActivit
   private final DynamicLanguage dynamicLanguage = new DynamicLanguage();
 
   private ConversationListFragment fragment;
-  private MasterSecret             masterSecret;
   private SearchToolbar            searchToolbar;
   private ImageView                searchAction;
 
@@ -68,9 +67,7 @@ public class ConversationListActivity extends PassphraseRequiredActionBarActivit
   }
 
   @Override
-  protected void onCreate(Bundle icicle, @NonNull MasterSecret masterSecret) {
-    this.masterSecret = masterSecret;
-
+  protected void onCreate(Bundle icicle, boolean ready) {
     setContentView(R.layout.conversation_list_activity);
 
     Toolbar toolbar = findViewById(R.id.toolbar);
@@ -78,7 +75,7 @@ public class ConversationListActivity extends PassphraseRequiredActionBarActivit
 
     searchToolbar = findViewById(R.id.search_toolbar);
     searchAction  = findViewById(R.id.search_action);
-    fragment      = initFragment(R.id.fragment_container, new ConversationListFragment(), masterSecret, dynamicLanguage.getCurrentLocale());
+    fragment      = initFragment(R.id.fragment_container, new ConversationListFragment(), dynamicLanguage.getCurrentLocale());
 
     initializeSearchListener();
 
@@ -111,8 +108,15 @@ public class ConversationListActivity extends PassphraseRequiredActionBarActivit
   }
 
   private void initializeSearchListener() {
-    searchAction.setOnClickListener(v -> searchToolbar.display(searchAction.getX() + (searchAction.getWidth() / 2),
-                                                               searchAction.getY() + (searchAction.getHeight() / 2)));
+    searchAction.setOnClickListener(v -> {
+      Permissions.with(this)
+                 .request(Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS)
+                 .ifNecessary()
+                 .onAllGranted(() -> searchToolbar.display(searchAction.getX() + (searchAction.getWidth() / 2),
+                                                           searchAction.getY() + (searchAction.getHeight() / 2)))
+                 .withPermanentDenialDialog(getString(R.string.ConversationListActivity_signal_needs_contacts_permission_in_order_to_search_your_contacts_but_it_has_been_permanently_denied))
+                 .execute();
+    });
 
     searchToolbar.setListener(new SearchToolbar.SearchListener() {
       @Override
@@ -201,7 +205,7 @@ public class ConversationListActivity extends PassphraseRequiredActionBarActivit
         Context                 context    = ConversationListActivity.this;
         List<MarkedMessageInfo> messageIds = DatabaseFactory.getThreadDatabase(context).setAllThreadsRead();
 
-        MessageNotifier.updateNotification(context, masterSecret);
+        MessageNotifier.updateNotification(context);
         MarkReadReceiver.process(context, messageIds);
 
         return null;
