@@ -61,8 +61,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -74,7 +76,7 @@ public class AttachmentDatabase extends Database {
   public  static final String TABLE_NAME             = "part";
   public  static final String ROW_ID                 = "_id";
           static final String ATTACHMENT_JSON_ALIAS  = "attachment_json";
-          static final String MMS_ID                 = "mid";
+  public  static final String MMS_ID                 = "mid";
           static final String CONTENT_TYPE           = "ct";
           static final String NAME                   = "name";
           static final String CONTENT_DISPOSITION    = "cd";
@@ -285,7 +287,6 @@ public class AttachmentDatabase extends Database {
     }
   }
 
-
   @SuppressWarnings("ResultOfMethodCallIgnored")
   void deleteAllAttachments() {
     SQLiteDatabase database = databaseHelper.getWritableDatabase();
@@ -347,19 +348,26 @@ public class AttachmentDatabase extends Database {
     thumbnailExecutor.submit(new ThumbnailFetchCallable(attachmentId));
   }
 
-  void insertAttachmentsForMessage(long mmsId, @NonNull List<Attachment> attachments, @NonNull List<Attachment> quoteAttachment)
+  @NonNull Map<Attachment, AttachmentId> insertAttachmentsForMessage(long mmsId, @NonNull List<Attachment> attachments, @NonNull List<Attachment> quoteAttachment)
       throws MmsException
   {
     Log.w(TAG, "insertParts(" + attachments.size() + ")");
 
+    Map<Attachment, AttachmentId> insertedAttachments = new HashMap<>();
+
     for (Attachment attachment : attachments) {
       AttachmentId attachmentId = insertAttachment(mmsId, attachment, attachment.isQuote());
+      insertedAttachments.put(attachment, attachmentId);
       Log.w(TAG, "Inserted attachment at ID: " + attachmentId);
     }
 
     for (Attachment attachment : quoteAttachment) {
-      insertAttachment(mmsId, attachment, true);
+      AttachmentId attachmentId = insertAttachment(mmsId, attachment, true);
+      insertedAttachments.put(attachment, attachmentId);
+      Log.w(TAG, "Inserted quoted attachment at ID: " + attachmentId);
     }
+
+    return insertedAttachments;
   }
 
   public @NonNull Attachment updateAttachmentData(@NonNull Attachment attachment,

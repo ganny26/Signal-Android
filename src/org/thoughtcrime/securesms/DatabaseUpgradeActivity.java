@@ -81,6 +81,8 @@ public class DatabaseUpgradeActivity extends BaseActivity {
   public static final int SQLCIPHER_COMPLETE                   = 352;
   public static final int REMOVE_JOURNAL                       = 353;
   public static final int REMOVE_CACHE                         = 354;
+  public static final int FULL_TEXT_SEARCH                     = 358;
+  public static final int BAD_IMPORT_CLEANUP                   = 373;
 
   private static final SortedSet<Integer> UPGRADE_VERSIONS = new TreeSet<Integer>() {{
     add(NO_MORE_KEY_EXCHANGE_PREFIX_VERSION);
@@ -101,6 +103,8 @@ public class DatabaseUpgradeActivity extends BaseActivity {
     add(SQLCIPHER);
     add(SQLCIPHER_COMPLETE);
     add(REMOVE_CACHE);
+    add(FULL_TEXT_SEARCH);
+    add(BAD_IMPORT_CLEANUP);
   }};
 
   private MasterSecret masterSecret;

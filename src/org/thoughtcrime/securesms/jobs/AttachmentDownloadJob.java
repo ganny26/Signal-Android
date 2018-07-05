@@ -8,11 +8,14 @@ import android.util.Log;
 import org.greenrobot.eventbus.EventBus;
 import org.thoughtcrime.securesms.attachments.Attachment;
 import org.thoughtcrime.securesms.attachments.AttachmentId;
+import org.thoughtcrime.securesms.attachments.DatabaseAttachment;
 import org.thoughtcrime.securesms.crypto.MasterSecret;
 import org.thoughtcrime.securesms.database.AttachmentDatabase;
 import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.dependencies.InjectableType;
 import org.thoughtcrime.securesms.events.PartProgressEvent;
+import org.thoughtcrime.securesms.jobmanager.JobParameters;
+import org.thoughtcrime.securesms.jobmanager.requirements.NetworkRequirement;
 import org.thoughtcrime.securesms.jobs.requirements.MasterSecretRequirement;
 import org.thoughtcrime.securesms.mms.MmsException;
 import org.thoughtcrime.securesms.notifications.MessageNotifier;
@@ -20,8 +23,6 @@ import org.thoughtcrime.securesms.util.AttachmentUtil;
 import org.thoughtcrime.securesms.util.Base64;
 import org.thoughtcrime.securesms.util.Hex;
 import org.thoughtcrime.securesms.util.Util;
-import org.whispersystems.jobqueue.JobParameters;
-import org.whispersystems.jobqueue.requirements.NetworkRequirement;
 import org.whispersystems.libsignal.InvalidMessageException;
 import org.whispersystems.libsignal.util.guava.Optional;
 import org.whispersystems.signalservice.api.SignalServiceMessageReceiver;
@@ -69,7 +70,7 @@ public class AttachmentDownloadJob extends MasterSecretJob implements Injectable
   public void onRun(MasterSecret masterSecret) throws IOException {
     final AttachmentDatabase database     = DatabaseFactory.getAttachmentDatabase(context);
     final AttachmentId       attachmentId = new AttachmentId(partRowId, partUniqueId);
-    final Attachment         attachment   = database.getAttachment(attachmentId);
+    final DatabaseAttachment attachment   = database.getAttachment(attachmentId);
 
     if (attachment == null) {
       Log.w(TAG, "attachment no longer exists.");

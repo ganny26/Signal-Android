@@ -4,7 +4,9 @@ package org.thoughtcrime.securesms.database.helpers;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
+import android.os.SystemClock;
 import android.support.annotation.NonNull;
+import android.text.TextUtils;
 import android.util.Log;
 
 import net.sqlcipher.database.SQLiteDatabase;
@@ -23,6 +25,7 @@ import org.thoughtcrime.securesms.database.MmsDatabase;
 import org.thoughtcrime.securesms.database.OneTimePreKeyDatabase;
 import org.thoughtcrime.securesms.database.PushDatabase;
 import org.thoughtcrime.securesms.database.RecipientDatabase;
+import org.thoughtcrime.securesms.database.SearchDatabase;
 import org.thoughtcrime.securesms.database.SessionDatabase;
 import org.thoughtcrime.securesms.database.SignedPreKeyDatabase;
 import org.thoughtcrime.securesms.database.SmsDatabase;
@@ -44,8 +47,11 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
   private static final int NO_MORE_IMAGE_THUMBNAILS_VERSION = 5;
   private static final int ATTACHMENT_DIMENSIONS            = 6;
   private static final int QUOTED_REPLIES                   = 7;
+  private static final int SHARED_CONTACTS                  = 8;
+  private static final int FULL_TEXT_SEARCH                 = 9;
+  private static final int BAD_IMPORT_CLEANUP               = 10;
 
-  private static final int    DATABASE_VERSION = 7;
+  private static final int    DATABASE_VERSION = 10;
   private static final String DATABASE_NAME    = "signal.db";
 
   private final Context        context;
@@ -85,6 +91,9 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
     db.execSQL(OneTimePreKeyDatabase.CREATE_TABLE);
     db.execSQL(SignedPreKeyDatabase.CREATE_TABLE);
     db.execSQL(SessionDatabase.CREATE_TABLE);
+    for (String sql : SearchDatabase.CREATE_TABLE) {
+      db.execSQL(sql);
+    }
 
     executeStatements(db, SmsDatabase.CREATE_INDEXS);
     executeStatements(db, MmsDatabase.CREATE_INDEXS);
@@ -175,6 +184,55 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
         db.execSQL("ALTER TABLE mms ADD COLUMN quote_attachment INTEGER DEFAULT -1");
 
         db.execSQL("ALTER TABLE part ADD COLUMN quote INTEGER DEFAULT 0");
+      }
+
+      if (oldVersion < SHARED_CONTACTS) {
+        db.execSQL("ALTER TABLE mms ADD COLUMN shared_contacts TEXT");
+      }
+
+      if (oldVersion < FULL_TEXT_SEARCH) {
+        for (String sql : SearchDatabase.CREATE_TABLE) {
+          db.execSQL(sql);
+        }
+
+        Log.i(TAG, "Beginning to build search index.");
+        long start = SystemClock.elapsedRealtime();
+
+        db.execSQL("INSERT INTO sms_fts (rowid, body) SELECT _id, body FROM sms");
+
+        long smsFinished = SystemClock.elapsedRealtime();
+        Log.i(TAG, "Indexing SMS completed in " + (smsFinished - start) + " ms");
+
+        db.execSQL("INSERT INTO mms_fts (rowid, body) SELECT _id, body FROM mms");
+
+        long mmsFinished = SystemClock.elapsedRealtime();
+        Log.i(TAG, "Indexing MMS completed in " + (mmsFinished - smsFinished) + " ms");
+        Log.i(TAG, "Indexing finished. Total time: " + (mmsFinished - start) + " ms");
+      }
+
+      if (oldVersion < BAD_IMPORT_CLEANUP) {
+        String trimmedCondition = " NOT IN (SELECT _id FROM mms)";
+
+        db.delete("group_receipts", "mms_id" + trimmedCondition, null);
+
+        String[] columns = new String[] { "_id", "unique_id", "_data", "thumbnail"};
+
+        try (Cursor cursor = db.query("part", columns, "mid" + trimmedCondition, null, null, null, null)) {
+          while (cursor != null && cursor.moveToNext()) {
+            db.delete("part", "_id = ? AND unique_id = ?", new String[] { String.valueOf(cursor.getLong(0)), String.valueOf(cursor.getLong(1)) });
+
+            String data      = cursor.getString(2);
+            String thumbnail = cursor.getString(3);
+
+            if (!TextUtils.isEmpty(data)) {
+              new File(data).delete();
+            }
+
+            if (!TextUtils.isEmpty(thumbnail)) {
+              new File(thumbnail).delete();
+            }
+          }
+        }
       }
 
       db.setTransactionSuccessful();
